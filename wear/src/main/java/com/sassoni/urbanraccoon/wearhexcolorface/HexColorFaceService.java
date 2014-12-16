@@ -12,6 +12,7 @@ import android.text.format.Time;
 import android.util.Log;
 import android.view.SurfaceHolder;
 
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 public class HexColorFaceService extends CanvasWatchFaceService {
@@ -25,6 +26,7 @@ public class HexColorFaceService extends CanvasWatchFaceService {
     }
 
     public class Engine extends CanvasWatchFaceService.Engine {
+        static final int MSG_UPDATE_TIME = 0;
         static final int BACKGROUND_COLOR = Color.BLACK;
         static final int FOREGROUND_COLOR = Color.WHITE;
         static final int TEXT_SIZE = 50;
@@ -39,7 +41,7 @@ public class HexColorFaceService extends CanvasWatchFaceService {
                 invalidate();
                 long timeMs = System.currentTimeMillis();
                 long delayMs = INTERACTIVE_UPDATE_RATE_MS - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
-                updateTimeHandler.sendEmptyMessageDelayed(123, delayMs);
+                updateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
         };
 
@@ -57,7 +59,7 @@ public class HexColorFaceService extends CanvasWatchFaceService {
             textPaint.setTextSize(TEXT_SIZE);
 
             time = new Time();
-            updateTimeHandler.sendEmptyMessage(123);
+            updateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
         }
 
         @Override
@@ -65,14 +67,67 @@ public class HexColorFaceService extends CanvasWatchFaceService {
             Log.i(TAG, "onDraw");
             canvas.drawColor(BACKGROUND_COLOR);
             time.setToNow();
-            canvas.drawText(Integer.toString(time.hour)+":"+Integer.toString(time.minute)+":"+Integer.toString(time.second), 10, 100, textPaint);
+
+            String format = "%1$02d";
+            String hour = String.format(format, time.hour);
+            String minutes = String.format(format, time.minute);
+            String seconds = String.format(format, time.second);
+
+            Log.i(TAG, "Color: " + "#"+hour+minutes+seconds);
+            int c = Color.parseColor("#"+hour+minutes+seconds);
+            textPaint.setColor(c);
+
+            canvas.drawText( hour + ":" + minutes + ":" + seconds, 10, 100, textPaint);
         }
 
         @Override
         public void onTimeTick() {
+            Log.i(TAG, "onTimeTick");
             super.onTimeTick();
             invalidate();
         }
+
+        @Override
+        public void onAmbientModeChanged(boolean inAmbientMode) {
+            super.onAmbientModeChanged(inAmbientMode);
+            Log.i(TAG, "onAmbientModeChanged: " + inAmbientMode);
+            if (isInAmbientMode()) {
+//                boolean antiAlias = !inAmbientMode;
+//                mHourPaint.setAntiAlias(antiAlias);
+//                mMinutePaint.setAntiAlias(antiAlias);
+//                mSecondPaint.setAntiAlias(antiAlias);
+//                mTickPaint.setAntiAlias(antiAlias);
+            }
+            invalidate();
+            updateTimer();
+        }
+
+        @Override
+        public void onVisibilityChanged(boolean visible) {
+            Log.i(TAG, "onVisibilityChanged");
+            super.onVisibilityChanged(visible);
+            if (visible) {
+//                registerReceiver();
+                time.clear(TimeZone.getDefault().getID());
+                time.setToNow();
+            } //else {
+            // unregisterReceiver();
+            //}
+            updateTimer();
+        }
+
+        private void updateTimer() {
+            Log.i(TAG, "updateTimer");
+            updateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+            if (shouldTimerBeRunning()) {
+                updateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+            }
+        }
+
+        private boolean shouldTimerBeRunning() {
+            return isVisible() && !isInAmbientMode();
+        }
+
     }
 
 }
